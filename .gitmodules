@@ -1,3 +1,6 @@
 [submodule "pytorch-CycleGAN-and-pix2pix"]
 	path = pytorch-CycleGAN-and-pix2pix
 	url = https://github.com/beerboaa/pytorch-CycleGAN-and-pix2pix.git
+[submodule "cycada_release"]
+	path = cycada_release
+	url = https://github.com/beerboaa/cycada_release.git
