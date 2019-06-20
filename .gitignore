@@ -1,5 +1,5 @@
 .idea/
 datasets/
 weights/
-baseline/__pycache__
-baseline/checkpoints
+baseline/__pycache__/
+baseline/checkpoints/
