@@ -76,16 +76,15 @@ def init_model(net, restore):
     # check if cuda is available
     if torch.cuda.is_available():
         cudnn.benchmark = True
-        net.cuda()
+        net.to('cuda')
 
     return net
 
 
 def save_model(net, filename):
     """Save trained model."""
-    if not os.path.exists(params.model_root):
-        os.makedirs(params.model_root)
+    # if not os.path.exists(params.model_root):
+    #     os.makedirs(params.model_root)
     torch.save(net.state_dict(),
-               os.path.join(params.model_root, filename))
-    print("save pretrained model to: {}".format(os.path.join(params.model_root,
-                                                             filename)))
+               os.path.join(filename))
+    print("save pretrained model to: {}".format(os.path.join(filename)))

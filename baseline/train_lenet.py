@@ -12,14 +12,14 @@ from utils import save_model, init_model
 
 
 def init_parser(parser):
-    parser.add_argument('--data_dir', required=True, help='path to data directory containing train and test folders')
+    parser.add_argument('--data_dir', required=True, type=str, help='path to data directory containing train and test folders')
+    parser.add_argument('--name', required=True, type=str, help='name of the task')
     parser.add_argument('--mode', type=str, default='train', help='train or test')
-    parser.add_argument('--model_path', type=str, default=None, help='path to load model')
     parser.add_argument('--batch_size', type=int, default=128, help='batch size')
     parser.add_argument('--epoch', type=int, default=200, help='epoch')
-    parser.add_argument('--restore', type=str, default=None, help='load model to continue training')
-    parser.add_argument('--resume_epoch', type=int, default=1, 'which epoch to resume')
-    parser.add_argument('--save_path', type=str, default=None, 'where to save the model')
+    parser.add_argument('--restore', type=str, default=None, help='path to load model to continue training')
+    parser.add_argument('--resume_epoch', type=int, default=1, help='which epoch to resume')
+    parser.add_argument('--save_path', type=str, default=None, help='where to save the model')
     parser.add_argument('--image_size', type=str, default=(32, 32), help='load image size')
 
     return parser
@@ -31,9 +31,10 @@ def train(encoder, classifier, train_loader, test_loader, opt):
     encoder.train()
     classifier.train()
 
+
     # setup criterion
     optimizer = optim.Adam(list(encoder.parameters()) + list(classifier.parameters()),
-                           lr=0.001, betas=(0.5, 0.999))
+                           lr=1e-3)
     criterion = nn.CrossEntropyLoss()
 
     # start training
@@ -44,8 +45,9 @@ def train(encoder, classifier, train_loader, test_loader, opt):
             optimizer.zero_grad()
 
             # compute loss
+
             preds = classifier(encoder(images))
-            loss = criterion(preds, labels)
+            loss = criterion(preds, labels.long())
 
             # optimize
             loss.backward()
@@ -56,7 +58,7 @@ def train(encoder, classifier, train_loader, test_loader, opt):
                 print("Epoch [{}/{}] Step [{}/{}]: loss={}"
                       .format(epoch + 1,
                               opt.epoch,
-                              step + 1,
+                              i + 1,
                               len(train_loader),
                               loss.data[0]))
 
@@ -71,8 +73,8 @@ def train(encoder, classifier, train_loader, test_loader, opt):
                                                                                    test_loss,
                                                                                    test_acc))
         if epoch % 5 == 0:
-            save_model(encoder, "LeNet_encoder_{}.pt".format(epoch))
-            save_model(classifier, "LeNet_classifier_{}.pt".format(epoch))
+            save_model(encoder, os.path.join(opt.save_path, "LeNet_encoder_{}.pt".format(epoch)))
+            save_model(classifier, os.path.join(opt.save_path,"LeNet_classifier_{}.pt".format(epoch)))
 
 
 
@@ -88,10 +90,10 @@ def test(encoder, classifier, test_loader, opt):
     with torch.no_grad():
         for images, labels in test_loader:
             preds = classifier(encoder(images))
-            loss += criterion(preds, labels).data[0]
+            loss += criterion(preds, labels.long()).data[0]
 
-            pred_cls = torch.max(preds.data, 1)
-            acc += (pred_cls == labels).sum().item()
+            pred_cls = torch.max(preds.data, 1)[1]
+            acc += (pred_cls == labels.long()).sum().item()
 
     loss /= len(test_loader)
     acc /= len(test_loader.dataset)
@@ -107,6 +109,7 @@ if __name__ == "__main__":
 
     encoder = init_model(net=LeNetEncoder(), restore=opt.restore)
     classifier = init_model(net=LeNetClassifier(), restore=opt.restore)
+
 
     if opt.mode == 'train':
         dataset = Dataset(opt.data_dir, opt.mode, opt.image_size)

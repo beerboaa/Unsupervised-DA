@@ -2,3 +2,4 @@
 datasets/
 weights/
 baselines/__pycache__
+baselines/checkpoints
