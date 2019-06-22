@@ -36,10 +36,12 @@ def train(encoder, classifier, train_loader, test_loader, opt):
 
     # setup criterion
     optimizer = optim.SGD(list(encoder.parameters()) + list(classifier.parameters()), lr=0.001, momentum=0.9)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)
     criterion = nn.CrossEntropyLoss()
 
     # start training
     for epoch in range(opt.resume_epoch, opt.epoch + 1):
+        scheduler.step()
         for i, (images, labels) in enumerate(train_loader):
 
             # zero gradient for optimizer
@@ -98,11 +100,11 @@ def test(encoder, classifier, test_loader, opt):
             preds = classifier(encoder(images))
             loss += criterion(preds, labels.long()).data.item()
 
-            pred_cls = torch.max(preds.item(), 1)[1]
+            pred_cls = torch.max(preds, 1)[1]
             acc += (pred_cls == labels.long()).sum().item()
             c = (pred_cls == labels.long()).squeeze()
 
-            for correct, label in zip(c.data.item(), labels.data.item()):
+            for correct, label in zip(c, labels):
                 if correct == 1:
                     class_acc[label] += 1
                 class_total[label] += 1
