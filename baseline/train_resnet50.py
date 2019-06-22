@@ -98,7 +98,7 @@ def test(encoder, classifier, test_loader, opt):
             preds = classifier(encoder(images))
             loss += criterion(preds, labels.long()).data.item()
 
-            pred_cls = torch.max(preds.data.item(), 1)[1]
+            pred_cls = torch.max(preds.item(), 1)[1]
             acc += (pred_cls == labels.long()).sum().item()
             c = (pred_cls == labels.long()).squeeze()
 
