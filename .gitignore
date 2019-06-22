@@ -3,3 +3,4 @@ datasets/
 weights/
 baseline/__pycache__/
 baseline/checkpoints/
+baseline/slurms/
