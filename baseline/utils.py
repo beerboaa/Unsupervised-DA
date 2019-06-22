@@ -80,6 +80,20 @@ def init_model(net, restore):
 
     return net
 
+def load_model(net, restore):
+    # restore model weights
+    if restore is not None and os.path.exists(restore):
+        net.load_state_dict(torch.load(restore))
+        net.restored = True
+        print("Restore model from: {}".format(os.path.abspath(restore)))
+
+    # check if cuda is available
+    if torch.cuda.is_available():
+        cudnn.benchmark = True
+        net.to('cuda')
+
+    return net
+
 
 def save_model(net, filename):
     """Save trained model."""
