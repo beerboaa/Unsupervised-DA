@@ -60,18 +60,18 @@ def train(encoder, classifier, train_loader, test_loader, opt):
                               opt.epoch,
                               i + 1,
                               len(train_loader),
-                              loss.data[0]))
+                              loss.data))
 
         test_loss, test_acc, class_acc = test(encoder, classifier, test_loader, opt)
         print('End of epoch {}, loss={}, test_loss={}, test_acc={}'.format(epoch,
-                                                                           loss.data[0],
+                                                                           loss.data,
                                                                            test_loss,
                                                                            test_acc))
         print('Class accuracy:{}'.format(class_acc))
 
         with open(os.path.join(opt.save_path, 'loss_logs.txt'), 'a') as f:
             f.write('Epoch:{}, training loss:{}, test loss:{}, test acc:{}\n'.format(epoch,
-                                                                                     loss.data[0],
+                                                                                     loss.data,
                                                                                      test_loss,
                                                                                      test_acc))
             f.write('Class accuracy:{}\n'.format(class_acc))
@@ -96,7 +96,7 @@ def test(encoder, classifier, test_loader, opt):
     with torch.no_grad():
         for images, labels in test_loader:
             preds = classifier(encoder(images))
-            loss += criterion(preds, labels.long()).data[0]
+            loss += criterion(preds, labels.long()).data
 
             pred_cls = torch.max(preds.data, 1)[1]
             acc += (pred_cls == labels.long()).sum().item()
