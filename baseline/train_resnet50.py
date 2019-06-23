@@ -102,7 +102,7 @@ def test(encoder, classifier, test_loader, opt):
 
             pred_cls = torch.max(preds, 1)[1]
             acc += (pred_cls == labels.long()).sum().item()
-            c = (pred_cls == labels.long()).squeeze()
+            c = (pred_cls == labels.long())
 
             for correct, label in zip(c, labels):
                 if correct == 1:
