@@ -13,7 +13,7 @@ from utils import save_model, init_model
 
 def init_parser(parser):
     parser.add_argument('--data_dir', required=True, type=str, help='path to data directory containing train and test folders')
-    parser.add_argument('--name', required=True, type=str, help='name of the task')
+    parser.add_argument('--name', required=False, type=str, help='name of the task')
     parser.add_argument('--mode', type=str, default='train', help='train or test')
     parser.add_argument('--batch_size', type=int, default=128, help='batch size')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
@@ -37,10 +37,12 @@ def train(encoder, classifier, train_loader, test_loader, opt):
     # setup criterion
     optimizer = optim.Adam(list(encoder.parameters()) + list(classifier.parameters()),
                            lr=1e-3, betas=(0.5, 0.999))
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)
     criterion = nn.CrossEntropyLoss()
 
     # start training
     for epoch in range(opt.resume_epoch, opt.epoch + 1):
+        scheduler.step()
         for i, (images, labels) in enumerate(train_loader):
 
             # zero gradients for optimizer
@@ -62,18 +64,18 @@ def train(encoder, classifier, train_loader, test_loader, opt):
                               opt.epoch,
                               i + 1,
                               len(train_loader),
-                              loss.data[0]))
+                              loss.data.item()))
 
         test_loss, test_acc, class_acc = test(encoder, classifier, test_loader, opt)
         print('End of epoch {}, loss={}, test_loss={}, test_acc={}'.format(epoch,
-                                                                          loss.data[0],
+                                                                          loss.data.item(),
                                                                           test_loss,
                                                                           test_acc))
         print('Class accuracy:{}'.format(class_acc))
 
         with open(os.path.join(opt.save_path, 'loss_logs.txt'), 'a') as f:
             f.write('Epoch:{}, training loss:{}, test loss:{}, test acc:{}\n'.format(epoch,
-                                                                                   loss.data[0],
+                                                                                   loss.data.item(),
                                                                                    test_loss,
                                                                                    test_acc))
             f.write('Class accuracy:{}\n'.format(class_acc))
@@ -99,13 +101,13 @@ def test(encoder, classifier, test_loader, opt):
     with torch.no_grad():
         for images, labels in test_loader:
             preds = classifier(encoder(images))
-            loss += criterion(preds, labels.long()).data[0]
+            loss += criterion(preds, labels.long()).data.item()
 
             pred_cls = torch.max(preds.data, 1)[1]
             acc += (pred_cls == labels.long()).sum().item()
-            c = (pred_cls == labels.long()).squeeze()
+            c = (pred_cls == labels.long())
 
-            for correct, label in zip(c.data, labels.data):
+            for correct, label in zip(c, labels):
                 if correct == 1:
                     class_acc[label] += 1
                 class_total[label] += 1
