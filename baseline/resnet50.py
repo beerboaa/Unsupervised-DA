@@ -9,7 +9,7 @@ class ResNet50_encoder(nn.Module):
         super(ResNet50_encoder, self).__init__()
         resnet50 = models.resnet50(pretrained=True)
         self.encoder = nn.Sequential(*list(resnet50.children())[:-1])
-        self.set_parameter_requires_grad(self.encoder, True)
+        self.set_parameter_requires_grad(self.encoder, False)
 
     def set_parameter_requires_grad(self, model, feature_extracting):
         if feature_extracting:
