@@ -1,2 +1,2 @@
 # Unsupervised-DA
-Various unsupervised domain adaptation methods.
+Unsupervised domain adaptation with adversarial networks
