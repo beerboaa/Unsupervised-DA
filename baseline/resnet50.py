@@ -15,7 +15,7 @@ class ResNet50_encoder(nn.Module):
         if feature_extracting:
             for param in model.parameters():
                 param.requires_grad = False
-            for param in model[7][2].parameters(): # fine-tune last block
+            for param in model[7].parameters(): # fine-tune last block
                 param.requires_grad = True
 
     def forward(self, input):
