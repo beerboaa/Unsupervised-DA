@@ -1,17 +1,17 @@
 import torch
 from torch import nn
 from torch.nn import init
-from torch.optim import lr_scheduler
 from torchvision import models
 import torch.nn.functional as F
+from torch.autograd import Function
 
 
 def init_weights(net, gain=0.02):
     def init_func(layer):
         classname = layer.__class__.__name__
-        if hasattr(layer, 'weight') and (classname.find('Conv') != -1 or classname.find('Linear') != -1):
-            init.xavier_normal_(layer.weight.data, gain=gain)
-
+        if hasattr(layer, 'weight') and (classname.find('Conv') != -1):
+            init.xavier_normal_(layer.weight.data,  gain)
+            # init.normal_(layer.weight.data, 0.0, gain)
             if hasattr(layer, 'bias') and layer.bias is not None:
                 init.constant_(layer.bias.data, 0.0)
 
@@ -82,13 +82,14 @@ class LeNetEncoder(nn.Module):
             nn.MaxPool2d(kernel_size=2),
             nn.ReLU()
         )
+        self.fc1 = nn.Linear(50 * 5 * 5, 500)
 
     def forward(self, input):
         """Forward the LeNet."""
 
         bs = input.size(0)
         conv_out = self.encoder(input)
-        return conv_out.view(bs, -1)
+        return self.fc1(conv_out.view(bs, -1))
 
 class LeNetClassifier(nn.Module):
     """LeNet classifier model for ADDA."""
@@ -97,13 +98,13 @@ class LeNetClassifier(nn.Module):
         """Init LeNet encoder."""
         super(LeNetClassifier, self).__init__()
         self.fc1 = nn.Linear(50 * 5 * 5, 500)
-        self.fc2 = nn.Linear(500, 10)
+        self.fc1 = nn.Linear(500, 10)
 
     def forward(self, feat):
         """Forward the LeNet classifier."""
-        out = self.fc1(feat)
+        # out = self.fc1(feat)
         out = F.dropout(F.relu(feat), training=self.training)
-        out = self.fc2(out)
+        out = self.fc1(out)
         return out
 
 class DigitDiscriminator(nn.Module):
@@ -113,11 +114,11 @@ class DigitDiscriminator(nn.Module):
     def __init__(self):
         super(DigitDiscriminator, self).__init__()
 
-        self.discriminator = nn.Sequential(*[nn.Linear(512, 512),
+        self.discriminator = nn.Sequential(*[nn.Linear(500, 500),
                                              nn.LeakyReLU(0.2),
-                                             # nn.Linear(512, 512),
-                                             # nn.LeakyReLU(0.2),
-                                             nn.Linear(512, 1)])
+                                             nn.Linear(500, 500),
+                                             nn.LeakyReLU(0.2),
+                                             nn.Linear(500, 1)])
 
     def forward(self, input):
         return self.discriminator(input)
@@ -168,6 +169,62 @@ class GANLoss(nn.Module):
         return loss
 
 
+class CenterLoss(nn.Module):
+    """Center loss.
+
+    Reference:
+    Wen et al. A Discriminative Feature Learning Approach for Deep Face Recognition. ECCV 2016.
+
+    Args:
+        num_classes (int): number of classes.
+        feat_dim (int): feature dimension.
+    """
+
+    def __init__(self, num_classes=10, feat_dim=2):
+        super(CenterLoss, self).__init__()
+        self.num_classes = num_classes
+        self.feat_dim = feat_dim
+
+        if torch.cuda.is_available():
+            self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim).cuda())
+        else:
+            self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim))
+
+    def forward(self, x, labels):
+        """
+        Args:
+            x: feature matrix with shape (batch_size, feat_dim).
+            labels: ground truth labels with shape (batch_size).
+        """
+        batch_size = x.size(0)
+        distmat = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(batch_size, self.num_classes) + \
+                  torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_classes, batch_size).t()
+        distmat.addmm_(1, -2, x, self.centers.t())
+
+        classes = torch.arange(self.num_classes).long()
+        if torch.cuda.is_available(): classes = classes.cuda()
+        labels = labels.long().unsqueeze(1).expand(batch_size, self.num_classes)
+
+        mask = labels.eq(classes.expand(batch_size, self.num_classes))
+
+        dist = distmat * mask.float()
+        loss = dist.clamp(min=1e-12, max=1e+12).sum() / batch_size
+
+        return loss
+
+class ReverseLayerF(Function):
+
+    @staticmethod
+    def forward(ctx, x, alpha):
+        ctx.alpha = alpha
+
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        output = grad_output.neg() * ctx.alpha
+
+        return output, None
 
 
 

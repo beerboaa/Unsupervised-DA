@@ -4,3 +4,5 @@ weights/
 baseline/__pycache__/
 baseline/checkpoints/
 baseline/slurms/
+method/checkpoints/
+method/__pycache__/
