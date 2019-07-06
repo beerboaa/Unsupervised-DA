@@ -168,6 +168,7 @@ def train(model, train_loader, test_loader, opt):
                 source_center_loss.backward(retain_graph=True)
                 for param in model.center_loss.parameters():
                     param.grad.data *= (1. / (beta1))
+                nn.utils.clip_grad_norm_(model.center_loss.parameters(), 2.0)
                 optimizers['center_loss'].step()
 
             # set_zero_grad(optimizers, optimizers.keys())
@@ -197,6 +198,7 @@ def train(model, train_loader, test_loader, opt):
                 target_center_loss.backward(retain_graph=True)
                 for param in model.center_loss.parameters():
                     param.grad.data *= (1. / (beta2))
+                nn.utils.clip_grad_norm_(model.center_loss.parameters(), 2.0)
                 optimizers['center_loss'].step()
 
             # set_zero_grad(optimizers, optimizers.keys())
@@ -219,7 +221,7 @@ def train(model, train_loader, test_loader, opt):
                     print('loss_D_source={}, loss_C_source={}, loss_center_source={}'.
                            format(loss_D_source.data.item(), loss_C_source.data.item(), source_center_loss.data.item()))
                     if target_center_loss is not None:
-                        print('loss_D_target={}, loss_center_targe={}'.format(loss_D_target.data.item(), target_center_loss.data.item()))
+                        print('loss_D_target={}, loss_center_target={}'.format(loss_D_target.data.item(), target_center_loss.data.item()))
             else:
                 if ((i + 1) % 30 == 0):
                     print("Epoch [{}/{}] Step [{}/{}]:".format(epoch, opt.epoch, i + 1, len(train_loader)))
