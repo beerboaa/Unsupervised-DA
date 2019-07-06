@@ -168,20 +168,23 @@ def train(model, train_loader, test_loader, opt):
                 source_center_loss.backward(retain_graph=True)
                 for param in model.center_loss.parameters():
                     param.grad.data *= (1. / (beta1))
-                nn.utils.clip_grad_value_(model.center_loss.parameters(), 4.0)
+                nn.utils.clip_grad_value_(model.center_loss.parameters(), 5.0)
                 optimizers['center_loss'].step()
 
             # set_zero_grad(optimizers, optimizers.keys())
             (loss_C_source + loss_E_source).backward(retain_graph=True)
+            nn.utils.clip_grad_value_(model.classifier.parameters(), 5.0)
             optimizers['classifier'].step()
             if opt.share_encoder:
+                nn.utils.clip_grad_value_(model.encoder.parameters(), 5.0)
                 optimizers['encoder'].step()
             else:
+                nn.utils.clip_grad_value_(model.encoder_s.parameters(), 5.0)
                 optimizers['encoder_s'].step()
-                optimizers['encoder_t'].step()
 
             set_zero_grad(optimizers, optimizers.keys())
             loss_D_source.backward()
+            nn.utils.clip_grad_value_(model.discriminator.parameters(), 5.0)
             optimizers['discriminator'].step()
 
             # Target
@@ -198,19 +201,21 @@ def train(model, train_loader, test_loader, opt):
                 target_center_loss.backward(retain_graph=True)
                 for param in model.center_loss.parameters():
                     param.grad.data *= (1. / (beta2))
-                nn.utils.clip_grad_value_(model.center_loss.parameters(), 4.0)
+                nn.utils.clip_grad_value_(model.center_loss.parameters(), 5.0)
                 optimizers['center_loss'].step()
 
             # set_zero_grad(optimizers, optimizers.keys())
             loss_E_target.backward(retain_graph=True)
             if opt.share_encoder:
+                nn.utils.clip_grad_value_(model.encoder.parameters(), 5.0)
                 optimizers['encoder'].step()
             else:
-                optimizers['encoder_s'].step()
+                nn.utils.clip_grad_value_(model.encoder_t.parameters(), 5.0)
                 optimizers['encoder_t'].step()
 
             set_zero_grad(optimizers, optimizers.keys())
             loss_D_target.backward()
+            nn.utils.clip_grad_value_(model.discriminator.parameters(), 5.0)
             optimizers['discriminator'].step()
 
 
