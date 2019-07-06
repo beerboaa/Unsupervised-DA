@@ -168,7 +168,7 @@ def train(model, train_loader, test_loader, opt):
                 source_center_loss.backward(retain_graph=True)
                 for param in model.center_loss.parameters():
                     param.grad.data *= (1. / (beta1))
-                nn.utils.clip_grad_norm_(model.center_loss.parameters(), 2.0)
+                nn.utils.clip_grad_value_(model.center_loss.parameters(), 4.0)
                 optimizers['center_loss'].step()
 
             # set_zero_grad(optimizers, optimizers.keys())
@@ -198,7 +198,7 @@ def train(model, train_loader, test_loader, opt):
                 target_center_loss.backward(retain_graph=True)
                 for param in model.center_loss.parameters():
                     param.grad.data *= (1. / (beta2))
-                nn.utils.clip_grad_norm_(model.center_loss.parameters(), 2.0)
+                nn.utils.clip_grad_value_(model.center_loss.parameters(), 4.0)
                 optimizers['center_loss'].step()
 
             # set_zero_grad(optimizers, optimizers.keys())
