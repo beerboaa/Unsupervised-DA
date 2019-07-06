@@ -32,7 +32,7 @@ def init_parser():
     parser.add_argument('--alpha_d', type=float, default=1)
     parser.add_argument('--beta', type=float, default=0.002)
     parser.add_argument('--threshold_T', type=float, default=0.9)
-    parser.add_argument('--decay_step', type=int, default=30)
+    parser.add_argument('--decay_step', type=int, default=40)
     parser.add_argument('--unfreeze_layers', type=list, default=[4], help='which layer to fine tune')
 
     opt = parser.parse_args()
@@ -136,11 +136,11 @@ def train(model, train_loader, test_loader, opt):
         # step the scheduler
         step_scheduler(schedulers)
 
-        if epoch < 10:
+        if epoch < 20:
             beta1 = 0.001
             beta2 = 0
 
-        elif epoch < 20:
+        elif epoch < 40:
             beta1 = 0.002
             beta2 = 0.002
 
