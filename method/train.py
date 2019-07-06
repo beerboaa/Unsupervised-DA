@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from models import UDAAN
-from networks import GANLoss
+from networks import GANLoss, CenterLoss
 from data_loader import TrainDataset, TestDataset
 
 def init_parser():
@@ -59,7 +59,7 @@ def init_optimizer(model, opt):
         optimizers['encoder'] = optim.SGD(model.encoder.parameters(), lr=opt.lr_encoder, momentum=0.9)
     else:
         optimizers['encoder_s'] = optim.SGD(model.encoder_s.parameters(), lr=opt.lr_encoder, momentum=0.9)
-        optimizers['encoder_t'] = optim.SGD(model.encoder_t.parameters(), lr=opt.lr_encoder, momentum=0.9)
+        optimizers['encoder_t'] = optim.SGD(model.encoder_t.parameters(), lr=opt.lr_encoder * 0.1, momentum=0.9)
     if opt.use_center_loss:
         optimizers['center_loss'] = optim.SGD(model.center_loss.parameters(), lr=opt.lr_center, momentum=0.9)
     optimizers['classifier'] = optim.SGD(model.classifier.parameters(), lr=opt.lr_classifier, momentum=0.9)
@@ -174,7 +174,7 @@ def train(model, train_loader, test_loader, opt):
 
             loss_source = loss_D_source + loss_C_source
 
-            if source_center_loss is not None:
+            if opt.use_center_loss:
                 source_center_loss *= beta1
                 loss_source += source_center_loss
 
@@ -184,7 +184,7 @@ def train(model, train_loader, test_loader, opt):
                     param.grad.data *= (1. / (beta1 + 1e-7))
                 optimizers['center_loss'].step()
 
-            # set_zero_grad(optimizers, optimizers.keys())
+            set_zero_grad(optimizers, optimizers.keys())
             (loss_C_source + loss_E_source).backward(retain_graph=True)
             optimizers['classifier'].step()
             if opt.share_encoder:
@@ -204,7 +204,8 @@ def train(model, train_loader, test_loader, opt):
             loss_D_target = criterions['GANLoss'](target_domain_preds, False) * opt.alpha_d
             loss_E_target = criterions['GANLoss'](target_domain_preds, True) * opt.alpha_d
             loss_target = loss_D_target
-            if target_center_loss is not None and beta2 != 0 :
+
+            if opt.use_center_loss and beta2 != 0 :
                 target_center_loss *= beta2
                 loss_target += target_center_loss
 
@@ -242,7 +243,7 @@ def train(model, train_loader, test_loader, opt):
                           format(loss_D_source.data.item(), loss_C_source.data.item() ))
                     print('loss_D_target={}'.format(loss_D_target.data.item()))
 
-        test_loss, test_acc, class_acc = test(model, test_loader, opt)
+        test_loss, test_acc, class_acc = test(model, test_loader, criterions, opt)
         print('End of epoch {}, loss={}, test_loss={}, test_acc={}'.format(epoch,
                                                                            loss_C_source.data.item(),
                                                                            test_loss,
@@ -257,7 +258,7 @@ def train(model, train_loader, test_loader, opt):
             f.write('Class accuracy:{}\n'.format(class_acc))
 
 
-def test(model, test_loader, opt):
+def test(model, test_loader, criterions, opt):
     # set eval state
     if opt.share_encoder:
         model.encoder.eval()
@@ -277,7 +278,7 @@ def test(model, test_loader, opt):
     class_acc = np.zeros(opt.num_classes)
     class_total = np.zeros(opt.num_classes)
 
-    criterion = nn.CrossEntropyLoss()
+
     with torch.no_grad():
         for images, labels in test_loader:
             if torch.cuda.is_available():
@@ -287,7 +288,7 @@ def test(model, test_loader, opt):
                 preds = model.classifier(model.encoder(images))
             else:
                 preds = model.classifier(model.encoder_t(images))
-            loss += criterion(preds, labels.long()).data.item()
+            loss += criterions['CELoss'](preds, labels.long()).data.item()
 
             pred_cls = torch.max(preds, 1)[1]
             acc += (pred_cls == labels.long()).sum().item()
