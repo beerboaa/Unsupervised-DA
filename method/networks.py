@@ -45,7 +45,10 @@ class ResNet50_encoder(nn.Module):
             set_parameter_requires_grad(self.encoder, freeze_layers)
 
     def forward(self, input):
-        return self.encoder(input)
+        bs = input.size(0)
+        conv_out = self.encoder(input)
+
+        return conv_out.view(bs, -1)
 
 class Classifier(nn.Module):
     """
@@ -56,6 +59,7 @@ class Classifier(nn.Module):
         self.fc = nn.Linear(in_features=2048, out_features=num_classes)
 
     def forward(self, input):
+
         return self.fc(input)
 
 class LeNetEncoder(nn.Module):
@@ -71,7 +75,7 @@ class LeNetEncoder(nn.Module):
             # 1st conv layer
             # input [1 x 28 x 28]
             # output [20 x 12 x 12]
-            nn.Conv2d(1, 20, kernel_size=5),
+            nn.Conv2d(3, 20, kernel_size=5),
             nn.MaxPool2d(kernel_size=2),
             nn.ReLU(),
             # 2nd conv layer
@@ -130,11 +134,11 @@ class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
 
-        self.discriminator = nn.Sequential(*[nn.Linear(2048, 1024),
+        self.discriminator = nn.Sequential(*[nn.Linear(2048, 512),
                                              nn.LeakyReLU(0.2),
-                                             nn.Linear(1024, 1024),
+                                             nn.Linear(512, 512),
                                              nn.LeakyReLU(0.2),
-                                             nn.Linear(1024, 1)])
+                                             nn.Linear(512, 1)])
 
     def forward(self, input):
         return self.discriminator(input)

@@ -14,21 +14,23 @@ class UDAAN(nn.Module):
         if opt.share_encoder:
             if opt.image_size == 32:
                 self.encoder = networks.LeNetEncoder()
+                networks.init_weights(self.encoder)
             else:
                 self.encoder = networks.ResNet50_encoder(opt.freeze_layers)
 
-            networks.init_weights(self.encoder)
+
 
         else:
             if opt.image_size == 32:
                 self.encoder_s = networks.LeNetEncoder()
                 self.encoder_t = networks.LeNetEncoder()
+                networks.init_weights(self.encoder_s)
+                networks.init_weights(self.encoder_t)
             else:
                 self.encoder_s = networks.ResNet50_encoder(opt.freeze_layers)
                 self.encoder_t = networks.ResNet50_encoder(opt.freeze_layers)
 
-            networks.init_weights(self.encoder_s)
-            networks.init_weights(self.encoder_t)
+
 
         # init discriminator and classifier
         if opt.image_size == 32:

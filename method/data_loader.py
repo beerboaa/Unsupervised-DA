@@ -44,7 +44,7 @@ class TrainDataset(data.Dataset):
             self.transform = transforms.Compose([
                              transforms.Resize(opt.image_size, Image.BICUBIC),
                              transforms.ToTensor(),
-                             transforms.Normalize([0.5], [0.5])])
+                             transforms.Normalize([0.5,0.5,0.5], [0.5,0.5,0.5])])
 
     def __getitem__(self, index):
         if self.s_data_size >= self.t_data_size:
@@ -58,8 +58,10 @@ class TrainDataset(data.Dataset):
             s_image = Image.open(s_image_path).convert('RGB')
             t_image = Image.open(t_image_path).convert('RGB')
         else:
-            s_image = Image.open(s_image_path).convert('L')
-            t_image = Image.open(t_image_path).convert('L')
+            s_image = Image.open(s_image_path).convert('RGB')
+            t_image = Image.open(t_image_path).convert('RGB')
+            # s_image = Image.open(s_image_path).convert('L')
+            # t_image = Image.open(t_image_path).convert('L')
 
         s_image = self.transform(s_image)
         s_label = torch.from_numpy(np.array(int(ntpath.basename(s_image_path).split('_')[0])))
@@ -94,14 +96,15 @@ class TestDataset(data.Dataset):
             self.transform = transforms.Compose([
                              transforms.Resize(opt.image_size, Image.BICUBIC),
                              transforms.ToTensor(),
-                             transforms.Normalize([0.5], [0.5])])
+                             transforms.Normalize([0.5,0.5,0.5], [0.5,0.5,0.5])])
 
     def __getitem__(self, index):
         image_path = self.image_paths[index % self.data_size]
         if self.image_size == 224:
             image = Image.open(image_path).convert('RGB')
         else:
-            image = Image.open(image_path).convert('L')
+            image = Image.open(image_path).convert('RGB')
+            # image = Image.open(image_path).convert('L')
 
         image = self.transform(image)
         label = torch.from_numpy(np.array(int(ntpath.basename(image_path).split('_')[0])))
