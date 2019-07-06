@@ -22,12 +22,12 @@ def init_weights(net, gain=0.02):
     net.apply(init_func)
     print('Network initialized')
 
-def set_parameter_requires_grad(model, freeze_layers):
+def set_parameter_requires_grad(model, unfreeze_layers):
     for param in model.parameters():
         param.requires_grad = False
 
-    for layer in freeze_layers:
-        for param in model[layer].parameters(): # fine-tuning
+    for layer in unfreeze_layers:
+        for param in model[layer + 3].parameters(): # fine-tuning
             param.requires_grad = True
 
 
@@ -35,14 +35,14 @@ class ResNet50_encoder(nn.Module):
     """
     Resnet50 encoder
     """
-    def __init__(self, freeze_layers=[4]):
+    def __init__(self, unfreeze_layers=[4]):
         super(ResNet50_encoder, self).__init__()
 
         model = models.resnet50(pretrained=True)
         self.encoder = nn.Sequential(*list(model.children())[:-1])
 
-        if freeze_layers is not None or len(freeze_layers) > 0:
-            set_parameter_requires_grad(self.encoder, freeze_layers)
+        if unfreeze_layers is not None or len(unfreeze_layers) > 0:
+            set_parameter_requires_grad(self.encoder, unfreeze_layers)
 
     def forward(self, input):
         bs = input.size(0)

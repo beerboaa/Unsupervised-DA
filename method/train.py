@@ -18,7 +18,7 @@ def init_parser():
     parser.add_argument('--batch_size', type=int, default=32, help='batch size')
     parser.add_argument('--lr_encoder', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--lr_classifier', type=float, default=1e-3, help='learning rate')
-    parser.add_argument('--lr_center', type=float, default=0.001, help='learning rate')
+    parser.add_argument('--lr_center', type=float, default=0.5, help='learning rate')
     parser.add_argument('--lr_discriminator', type=float, default=1e-3)
     parser.add_argument('--epoch', type=int, default=200, help='epoch')
     parser.add_argument('--num_classes', type=int, required=True, help='number of classes')
@@ -32,15 +32,15 @@ def init_parser():
     parser.add_argument('--alpha_d', type=float, default=1)
     parser.add_argument('--beta', type=float, default=0.002)
     parser.add_argument('--threshold_T', type=float, default=0.9)
-    parser.add_argument('--decay_step', type=int, default=40)
-    parser.add_argument('--freeze_layers', type=list, default=[4], help='which layer to fine tune')
+    parser.add_argument('--decay_step', type=int, default=30)
+    parser.add_argument('--unfreeze_layers', type=list, default=[4], help='which layer to fine tune')
 
     opt = parser.parse_args()
 
     return opt
 
 def init_optimizer(model, opt):
-    enc_parameters = []
+
     optimizers = {}
 
     # if opt.share_encoder:
@@ -74,8 +74,8 @@ def init_scheduler(optimizers, opt):
     if opt.share_encoder:
         schedulers['encoder'] = optim.lr_scheduler.StepLR(optimizers['encoder'], step_size=opt.decay_step, gamma=0.5)
     else:
-        schedulers['encoder_s'] = optim.lr_scheduler.StepLR(optimizers['encoder_s'], step_size=opt.decay_step, gamma=0.1)
-        schedulers['encoder_t'] = optim.lr_scheduler.StepLR(optimizers['encoder_t'], step_size=opt.decay_step, gamma=0.1)
+        schedulers['encoder_s'] = optim.lr_scheduler.StepLR(optimizers['encoder_s'], step_size=opt.decay_step, gamma=0.5)
+        schedulers['encoder_t'] = optim.lr_scheduler.StepLR(optimizers['encoder_t'], step_size=opt.decay_step, gamma=0.5)
     # if opt.use_center_loss:
     #     # schedulers['center_loss'] = optim.lr_scheduler.StepLR(optimizers['center_loss'], step_size=opt.decay_step, gamma=0.1)
     schedulers['classifier'] = optim.lr_scheduler.StepLR(optimizers['classifier'], step_size=opt.decay_step, gamma=0.5)
@@ -95,7 +95,7 @@ def init_criterion(opt):
     criterions = {}
 
     criterions['GANLoss'] = GANLoss(opt.gan_mode).to('cuda') if torch.cuda.is_available() else GANLoss(opt.gan_mode)
-    criterions['CELoss'] = nn.CrossEntropyLoss()
+    criterions['CELoss'] = nn.CrossEntropyLoss().to('cuda') if torch.cuda.is_available() else nn.CrossEntropyLoss()
 
     return criterions
 
@@ -129,7 +129,6 @@ def train(model, train_loader, test_loader, opt):
 
     # setup criterion
     optimizers = init_optimizer(model, opt)
-    criterions = init_criterion(opt)
     schedulers = init_scheduler(optimizers, opt)
 
     # start training
@@ -137,11 +136,11 @@ def train(model, train_loader, test_loader, opt):
         # step the scheduler
         step_scheduler(schedulers)
 
-        if epoch < 20:
-            beta1 = 0.001 * 0
-            beta2 = 0 * 0
+        if epoch < 10:
+            beta1 = 0.001
+            beta2 = 0
 
-        elif epoch < 40:
+        elif epoch < 20:
             beta1 = 0.002
             beta2 = 0.002
 
@@ -166,6 +165,8 @@ def train(model, train_loader, test_loader, opt):
             # Source
             source_label_preds, source_domain_preds, source_center_loss = \
                                 model(source_images, source_labels, source_domains)
+
+            criterions = init_criterion(opt)
 
             loss_D_source = criterions['GANLoss'](source_domain_preds, True) * opt.alpha_d
             loss_E_source = criterions['GANLoss'](source_domain_preds, False) * opt.alpha_d
@@ -196,7 +197,7 @@ def train(model, train_loader, test_loader, opt):
             loss_D_source.backward()
             optimizers['discriminator'].step()
 
-            # # Target
+            # Target
             target_label_preds, target_domain_preds, target_center_loss = \
                                 model(target_images, target_labels, target_domains)
 
@@ -226,20 +227,20 @@ def train(model, train_loader, test_loader, opt):
             optimizers['discriminator'].step()
 
 
-            # if opt.use_center_loss:
-            #     # print step info
-            #     if ((i + 1) % 50 == 0):
-            #         print("Epoch [{}/{}] Step [{}/{}]:".format(epoch, opt.epoch, i + 1, len(train_loader)))
-            #         print('loss_D_source={}, loss_C_source={}, loss_center_source={}'.
-            #                format(loss_D_source.data.item(), loss_C_source.data.item(), source_center_loss.data.item()))
-            #         if target_center_loss is not None:
-            #             print('loss_D_target={}, loss_center_targe={}'.format(loss_D_target.data.item(), target_center_loss.data.item()))
-            # else:
-            #     if ((i + 1) % 50 == 0):
-            #         print("Epoch [{}/{}] Step [{}/{}]:".format(epoch, opt.epoch, i + 1, len(train_loader)))
-            #         print('loss_D_source={}, loss_C_source={}'.
-            #               format(loss_D_source.data.item(), loss_C_source.data.item() ))
-            #         print('loss_D_target={}'.format(loss_D_target.data.item()))
+            if opt.use_center_loss:
+                # print step info
+                if ((i + 1) % 30 == 0):
+                    print("Epoch [{}/{}] Step [{}/{}]:".format(epoch, opt.epoch, i + 1, len(train_loader)))
+                    print('loss_D_source={}, loss_C_source={}, loss_center_source={}'.
+                           format(loss_D_source.data.item(), loss_C_source.data.item(), source_center_loss.data.item()))
+                    if target_center_loss is not None:
+                        print('loss_D_target={}, loss_center_targe={}'.format(loss_D_target.data.item(), target_center_loss.data.item()))
+            else:
+                if ((i + 1) % 30 == 0):
+                    print("Epoch [{}/{}] Step [{}/{}]:".format(epoch, opt.epoch, i + 1, len(train_loader)))
+                    print('loss_D_source={}, loss_C_source={}'.
+                          format(loss_D_source.data.item(), loss_C_source.data.item() ))
+                    print('loss_D_target={}'.format(loss_D_target.data.item()))
 
         test_loss, test_acc, class_acc = test(model, test_loader, opt)
         print('End of epoch {}, loss={}, test_loss={}, test_acc={}'.format(epoch,

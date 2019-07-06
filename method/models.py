@@ -16,7 +16,7 @@ class UDAAN(nn.Module):
                 self.encoder = networks.LeNetEncoder()
                 networks.init_weights(self.encoder)
             else:
-                self.encoder = networks.ResNet50_encoder(opt.freeze_layers)
+                self.encoder = networks.ResNet50_encoder(opt.unfreeze_layers)
 
 
 
@@ -27,8 +27,8 @@ class UDAAN(nn.Module):
                 networks.init_weights(self.encoder_s)
                 networks.init_weights(self.encoder_t)
             else:
-                self.encoder_s = networks.ResNet50_encoder(opt.freeze_layers)
-                self.encoder_t = networks.ResNet50_encoder(opt.freeze_layers)
+                self.encoder_s = networks.ResNet50_encoder(opt.unfreeze_layers)
+                self.encoder_t = networks.ResNet50_encoder(opt.unfreeze_layers)
 
 
 
@@ -48,6 +48,7 @@ class UDAAN(nn.Module):
                 self.center_loss = networks.CenterLoss(opt.num_classes, self.classifier.fc1.in_features)
             else:
                 self.center_loss = networks.CenterLoss(opt.num_classes, self.classifier.fc.in_features)
+
 
     def forward(self, input, labels, domains):
         # consider 'source domain'
