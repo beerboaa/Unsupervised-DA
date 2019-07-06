@@ -18,7 +18,7 @@ def init_parser():
     parser.add_argument('--batch_size', type=int, default=32, help='batch size')
     parser.add_argument('--lr_encoder', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--lr_classifier', type=float, default=1e-3, help='learning rate')
-    parser.add_argument('--lr_center', type=float, default=0.5, help='learning rate')
+    parser.add_argument('--lr_center', type=float, default=0.1, help='learning rate')
     parser.add_argument('--lr_discriminator', type=float, default=1e-3)
     parser.add_argument('--epoch', type=int, default=200, help='epoch')
     parser.add_argument('--num_classes', type=int, required=True, help='number of classes')
@@ -42,18 +42,6 @@ def init_parser():
 def init_optimizer(model, opt):
 
     optimizers = {}
-
-    # if opt.share_encoder:
-    #     enc_parameters.append({'params': model.encoder.parameters(), 'lr': opt.lr_encoder})
-    # else:
-    #     enc_parameters.append({'params': model.encoder_s.parameters(), 'lr': opt.lr_encoder})
-    #     enc_parameters.append({'params': model.encoder_t.parameters(), 'lr': opt.lr_encoder})
-    #
-    # if opt.use_center_loss:
-    #     cen_parameters = {'params': model.center_loss.parameters(), 'lr': opt.lr_center}
-    #
-    # cls_parameters = {'params': model.classifier.parameters(), 'lr': opt.lr_classifier}
-    # dis_parameters = {'params': model.discriminator.parameters(), 'lr': opt.lr_discriminator}
 
     if opt.share_encoder:
         optimizers['encoder'] = optim.SGD(model.encoder.parameters(), lr=opt.lr_encoder, momentum=0.9)
@@ -131,6 +119,7 @@ def train(model, train_loader, test_loader, opt):
     optimizers = init_optimizer(model, opt)
     schedulers = init_scheduler(optimizers, opt)
 
+    test_acc_max = 0.0
     # start training
     for epoch in range(1, opt.epoch + 1):
         # step the scheduler
@@ -172,19 +161,16 @@ def train(model, train_loader, test_loader, opt):
             loss_E_source = criterions['GANLoss'](source_domain_preds, False) * opt.alpha_d
             loss_C_source = criterions['CELoss'](source_label_preds, source_labels.long()) * opt.alpha_c
 
-            loss_source = loss_D_source + loss_C_source
-
+            set_zero_grad(optimizers, optimizers.keys())
             if opt.use_center_loss:
                 source_center_loss *= beta1
-                loss_source += source_center_loss
 
-                set_zero_grad(optimizers, optimizers.keys())
                 source_center_loss.backward(retain_graph=True)
                 for param in model.center_loss.parameters():
-                    param.grad.data *= (1. / (beta1 + 1e-7))
+                    param.grad.data *= (1. / (beta1))
                 optimizers['center_loss'].step()
 
-            set_zero_grad(optimizers, optimizers.keys())
+            # set_zero_grad(optimizers, optimizers.keys())
             (loss_C_source + loss_E_source).backward(retain_graph=True)
             optimizers['classifier'].step()
             if opt.share_encoder:
@@ -203,19 +189,17 @@ def train(model, train_loader, test_loader, opt):
 
             loss_D_target = criterions['GANLoss'](target_domain_preds, False) * opt.alpha_d
             loss_E_target = criterions['GANLoss'](target_domain_preds, True) * opt.alpha_d
-            loss_target = loss_D_target
 
-            if opt.use_center_loss and beta2 != 0 :
+            set_zero_grad(optimizers, optimizers.keys())
+            if opt.use_center_loss and beta2 != 0 and target_center_loss is not None:
                 target_center_loss *= beta2
-                loss_target += target_center_loss
 
-                set_zero_grad(optimizers, optimizers.keys())
                 target_center_loss.backward(retain_graph=True)
                 for param in model.center_loss.parameters():
                     param.grad.data *= (1. / (beta2))
                 optimizers['center_loss'].step()
 
-            set_zero_grad(optimizers, optimizers.keys())
+            # set_zero_grad(optimizers, optimizers.keys())
             loss_E_target.backward(retain_graph=True)
             if opt.share_encoder:
                 optimizers['encoder'].step()
@@ -256,6 +240,14 @@ def train(model, train_loader, test_loader, opt):
                                                                                      test_loss,
                                                                                      test_acc))
             f.write('Class accuracy:{}\n'.format(class_acc))
+
+        if test_acc > test_acc_max:
+            test_acc_max = test_acc
+            if opt.share_encoder:
+                torch.save(model.encoder.state_dict(), os.path.join(opt.save_path, 'Encoder_{}.pt'.format(epoch)))
+            else:
+                torch.save(model.encoder_t.state_dict(), os.path.join(opt.save_path, 'Encoder_t_{}.pt'.format(epoch)))
+            print("save best model to : {}".format(opt.save_path))
 
 
 def test(model, test_loader, criterions, opt):
