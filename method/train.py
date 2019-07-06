@@ -44,14 +44,14 @@ def init_optimizer(model, opt):
     optimizers = {}
 
     if opt.share_encoder:
-        optimizers['encoder'] = optim.SGD(model.encoder.parameters(), lr=opt.lr_encoder, momentum=0.9)
+        optimizers['encoder'] = optim.SGD(model.encoder.parameters(), lr=opt.lr_encoder, weight_decay=5e-04, momentum=0.9)
     else:
-        optimizers['encoder_s'] = optim.SGD(model.encoder_s.parameters(), lr=opt.lr_encoder, momentum=0.9)
-        optimizers['encoder_t'] = optim.SGD(model.encoder_t.parameters(), lr=opt.lr_encoder * 0.1, momentum=0.9)
+        optimizers['encoder_s'] = optim.SGD(model.encoder_s.parameters(), lr=opt.lr_encoder, weight_decay=5e-04, momentum=0.9)
+        optimizers['encoder_t'] = optim.SGD(model.encoder_t.parameters(), lr=opt.lr_encoder * 0.1, weight_decay=5e-04, momentum=0.9)
     if opt.use_center_loss:
         optimizers['center_loss'] = optim.SGD(model.center_loss.parameters(), lr=opt.lr_center, momentum=0.9)
-    optimizers['classifier'] = optim.SGD(model.classifier.parameters(), lr=opt.lr_classifier, momentum=0.9)
-    optimizers['discriminator'] = optim.SGD(model.discriminator.parameters(), lr=opt.lr_discriminator, momentum=0.9)
+    optimizers['classifier'] = optim.SGD(model.classifier.parameters(), lr=opt.lr_classifier, weight_decay=5e-04, momentum=0.9)
+    optimizers['discriminator'] = optim.SGD(model.discriminator.parameters(), lr=opt.lr_discriminator, weight_decay=5e-04, momentum=0.9)
     # optimizer = optim.SGD(parameters, lr=opt.lr_encoder, momentum=0.9)
 
     return optimizers
@@ -303,6 +303,7 @@ if __name__=="__main__":
     model = UDAAN(opt)
 
     if torch.cuda.is_available():
+        cudnn.benchmark = True
         model.to('cuda')
 
     source, target = opt.direction.split('to')

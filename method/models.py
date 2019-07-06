@@ -79,7 +79,7 @@ class UDAAN(nn.Module):
 
             # pseudo labels
             if self.use_center_loss:
-                prob, label_prediction = torch.max(nn.Softmax()(label_prediction), 1)
+                prob, label_prediction = torch.max(nn.Softmax(dim=1)(label_prediction), 1)
 
                 if len(prob[prob > self.threshold_T]) > 0:
                     center_loss = self.center_loss(features, label_prediction)
