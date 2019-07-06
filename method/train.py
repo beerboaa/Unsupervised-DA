@@ -20,7 +20,7 @@ def init_parser():
     parser.add_argument('--lr_classifier', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--lr_center', type=float, default=0.001, help='learning rate')
     parser.add_argument('--lr_discriminator', type=float, default=1e-3)
-    parser.add_argument('--epoch', type=int, default=300, help='epoch')
+    parser.add_argument('--epoch', type=int, default=200, help='epoch')
     parser.add_argument('--num_classes', type=int, required=True, help='number of classes')
     parser.add_argument('--image_size', type=int, required=True, help='input size')
     parser.add_argument('--share_encoder', action='store_true', help='share or unshare encoder')
@@ -32,7 +32,7 @@ def init_parser():
     parser.add_argument('--alpha_d', type=float, default=1)
     parser.add_argument('--beta', type=float, default=0.002)
     parser.add_argument('--threshold_T', type=float, default=0.9)
-    parser.add_argument('--decay_step', type=int, default=30)
+    parser.add_argument('--decay_step', type=int, default=40)
     parser.add_argument('--freeze_layers', type=list, default=[4], help='which layer to fine tune')
 
     opt = parser.parse_args()
