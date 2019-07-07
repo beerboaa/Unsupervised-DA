@@ -32,7 +32,7 @@ def init_parser():
     parser.add_argument('--alpha_d', type=float, default=1)
     parser.add_argument('--beta', type=float, default=0.002)
     parser.add_argument('--threshold_T', type=float, default=0.9)
-    parser.add_argument('--decay_step', type=int, default=40)
+    parser.add_argument('--decay_step', type=int, default=10)
     parser.add_argument('--unfreeze_layers', type=list, default=[4], help='which layer to fine tune')
     parser.add_argument('--copy_epoch', type=int, default=15, help='which epoch to start training target networks')
 
@@ -126,11 +126,11 @@ def train(model, train_loader, test_loader, opt):
         # step the scheduler
         step_scheduler(schedulers)
 
-        if epoch < 30:
+        if epoch < 15:
             beta1 = 0.001
             beta2 = 0
 
-        elif epoch < 60:
+        elif epoch < 30:
             beta1 = 0.002
             beta2 = 0.002
 
