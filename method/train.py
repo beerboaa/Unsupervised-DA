@@ -134,8 +134,8 @@ def train(model, train_loader, test_loader, opt):
             beta2 = 0.002
 
         else:
-            beta1 = 0.01
-            beta2 = 0.01
+            beta1 = 0.02
+            beta2 = 0.02
 
 
         for i, data in enumerate(train_loader):
