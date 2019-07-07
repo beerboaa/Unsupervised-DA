@@ -44,14 +44,14 @@ def init_optimizer(model, opt):
     optimizers = {}
 
     if opt.share_encoder:
-        optimizers['encoder'] = optim.SGD(model.encoder.parameters(), lr=opt.lr_encoder, weight_decay=5e-04, momentum=0.9)
+        optimizers['encoder'] = optim.Adam(model.encoder.parameters(), lr=opt.lr_encoder, betas=(0.5, 0.999))
     else:
-        optimizers['encoder_s'] = optim.SGD(model.encoder_s.parameters(), lr=opt.lr_encoder, weight_decay=5e-04, momentum=0.9)
-        optimizers['encoder_t'] = optim.SGD(model.encoder_t.parameters(), lr=opt.lr_encoder * 0.1, weight_decay=5e-04, momentum=0.9)
+        optimizers['encoder_s'] = optim.Adam(model.encoder_s.parameters(), lr=opt.lr_encoder, betas=(0.5, 0.999))
+        optimizers['encoder_t'] = optim.Adam(model.encoder_t.parameters(), lr=opt.lr_encoder * 0.1, betas=(0.5, 0.999))
     if opt.use_center_loss:
-        optimizers['center_loss'] = optim.SGD(model.center_loss.parameters(), lr=opt.lr_center, momentum=0.9)
-    optimizers['classifier'] = optim.SGD(model.classifier.parameters(), lr=opt.lr_classifier, weight_decay=5e-04, momentum=0.9)
-    optimizers['discriminator'] = optim.SGD(model.discriminator.parameters(), lr=opt.lr_discriminator, weight_decay=5e-04, momentum=0.9)
+        optimizers['center_loss'] = optim.Adam(model.center_loss.parameters(), lr=opt.lr_center, momentum=0.9)
+    optimizers['classifier'] = optim.Adam(model.classifier.parameters(), lr=opt.lr_classifier, betas=(0.5, 0.999))
+    optimizers['discriminator'] = optim.Adam(model.discriminator.parameters(), lr=opt.lr_discriminator, betas=(0.5, 0.999))
     # optimizer = optim.SGD(parameters, lr=opt.lr_encoder, momentum=0.9)
 
     return optimizers
