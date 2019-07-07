@@ -32,7 +32,7 @@ def init_parser():
     parser.add_argument('--alpha_d', type=float, default=1)
     parser.add_argument('--beta', type=float, default=0.002)
     parser.add_argument('--threshold_T', type=float, default=0.9)
-    parser.add_argument('--decay_step', type=int, default=10)
+    parser.add_argument('--decay_step', type=int, default=40)
     parser.add_argument('--unfreeze_layers', type=list, default=[4], help='which layer to fine tune')
     parser.add_argument('--copy_epoch', type=int, default=15, help='which epoch to start training target networks')
 
@@ -45,14 +45,14 @@ def init_optimizer(model, opt):
     optimizers = {}
 
     if opt.share_encoder:
-        optimizers['encoder'] = optim.Adam(model.encoder.parameters(), lr=opt.lr_encoder, betas=(0.5, 0.999))
+        optimizers['encoder'] = optim.SGD(model.encoder.parameters(), lr=opt.lr_encoder, weight_decay=5e-04, momentum=0.9)
     else:
-        optimizers['encoder_s'] = optim.Adam(model.encoder_s.parameters(), lr=opt.lr_encoder, betas=(0.5, 0.999))
-        optimizers['encoder_t'] = optim.Adam(model.encoder_t.parameters(), lr=opt.lr_encoder, betas=(0.5, 0.999))
+        optimizers['encoder_s'] = optim.SGD(model.encoder_s.parameters(), lr=opt.lr_encoder, weight_decay=5e-04, momentum=0.9)
+        optimizers['encoder_t'] = optim.SGD(model.encoder_t.parameters(), lr=opt.lr_encoder, weight_decay=5e-04, momentum=0.9)
     if opt.use_center_loss:
         optimizers['center_loss'] = optim.SGD(model.center_loss.parameters(), lr=opt.lr_center, momentum=0.9)
-    optimizers['classifier'] = optim.Adam(model.classifier.parameters(), lr=opt.lr_classifier, betas=(0.5, 0.999))
-    optimizers['discriminator'] = optim.Adam(model.discriminator.parameters(), lr=opt.lr_discriminator, betas=(0.5, 0.999))
+    optimizers['classifier'] = optim.SGD(model.classifier.parameters(), lr=opt.lr_classifier, weight_decay=5e-04, momentum=0.9)
+    optimizers['discriminator'] = optim.SGD(model.discriminator.parameters(), lr=opt.lr_discriminator, weight_decay=5e-04, momentum=0.9)
     # optimizer = optim.SGD(parameters, lr=opt.lr_encoder, momentum=0.9)
 
     return optimizers
@@ -126,17 +126,17 @@ def train(model, train_loader, test_loader, opt):
         # step the scheduler
         step_scheduler(schedulers)
 
-        if epoch < 15:
+        if epoch < 30:
             beta1 = 0.001
             beta2 = 0
 
-        elif epoch < 30:
+        elif epoch < 60:
             beta1 = 0.002
             beta2 = 0.002
 
         else:
-            beta1 = 0.02
-            beta2 = 0.02
+            beta1 = 0.01
+            beta2 = 0.01
 
 
         for i, data in enumerate(train_loader):
@@ -210,7 +210,7 @@ def train(model, train_loader, test_loader, opt):
                 optimizers['center_loss'].step()
 
             if opt.share_encoder or epoch >= opt.copy_epoch:
-                if epoch==opt.copy_epoch:
+                if epoch==opt.copy_epoch and not opt.share_encoder:
                     model.encoder_t.load_state_dict(model.encoder_s.state_dict())
                 # set_zero_grad(optimizers, optimizers.keys())
                 loss_E_target.backward(retain_graph=True)
