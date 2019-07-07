@@ -32,8 +32,9 @@ def init_parser():
     parser.add_argument('--alpha_d', type=float, default=1)
     parser.add_argument('--beta', type=float, default=0.002)
     parser.add_argument('--threshold_T', type=float, default=0.9)
-    parser.add_argument('--decay_step', type=int, default=20)
+    parser.add_argument('--decay_step', type=int, default=40)
     parser.add_argument('--unfreeze_layers', type=list, default=[4], help='which layer to fine tune')
+    parser.add_argument('--copy_epoch', type=int, default=15, help='which epoch to start training target networks')
 
     opt = parser.parse_args()
 
@@ -44,14 +45,14 @@ def init_optimizer(model, opt):
     optimizers = {}
 
     if opt.share_encoder:
-        optimizers['encoder'] = optim.SGD(model.encoder.parameters(), lr=opt.lr_encoder, weight_decay=5e-04, momentum=0.9)
+        optimizers['encoder'] = optim.Adam(model.encoder.parameters(), lr=opt.lr_encoder, betas=(0.5, 0.999))
     else:
-        optimizers['encoder_s'] = optim.SGD(model.encoder_s.parameters(), lr=opt.lr_encoder, weight_decay=5e-04, momentum=0.9)
-        optimizers['encoder_t'] = optim.SGD(model.encoder_t.parameters(), lr=opt.lr_encoder * 0.1, weight_decay=5e-04, momentum=0.9)
+        optimizers['encoder_s'] = optim.Adam(model.encoder_s.parameters(), lr=opt.lr_encoder, betas=(0.5, 0.999))
+        optimizers['encoder_t'] = optim.Adam(model.encoder_t.parameters(), lr=opt.lr_encoder, betas=(0.5, 0.999))
     if opt.use_center_loss:
         optimizers['center_loss'] = optim.SGD(model.center_loss.parameters(), lr=opt.lr_center, momentum=0.9)
-    optimizers['classifier'] = optim.SGD(model.classifier.parameters(), lr=opt.lr_classifier, weight_decay=5e-04, momentum=0.9)
-    optimizers['discriminator'] = optim.SGD(model.discriminator.parameters(), lr=opt.lr_discriminator, weight_decay=5e-04, momentum=0.9)
+    optimizers['classifier'] = optim.Adam(model.classifier.parameters(), lr=opt.lr_classifier, betas=(0.5, 0.999))
+    optimizers['discriminator'] = optim.Adam(model.discriminator.parameters(), lr=opt.lr_discriminator, betas=(0.5, 0.999))
     # optimizer = optim.SGD(parameters, lr=opt.lr_encoder, momentum=0.9)
 
     return optimizers
@@ -125,17 +126,17 @@ def train(model, train_loader, test_loader, opt):
         # step the scheduler
         step_scheduler(schedulers)
 
-        if epoch < 15:
+        if epoch < 30:
             beta1 = 0.001
             beta2 = 0
 
-        elif epoch < 30:
+        elif epoch < 60:
             beta1 = 0.002
             beta2 = 0.002
 
         else:
-            beta1 = 0.01
-            beta2 = 0.01
+            beta1 = 0.02
+            beta2 = 0.02
 
 
         for i, data in enumerate(train_loader):
@@ -171,8 +172,11 @@ def train(model, train_loader, test_loader, opt):
                 nn.utils.clip_grad_value_(model.center_loss.parameters(), 5.0)
                 optimizers['center_loss'].step()
 
-            # set_zero_grad(optimizers, optimizers.keys())
-            (loss_C_source + loss_E_source).backward(retain_graph=True)
+            if opt.share_encoder or epoch >= opt.copy_epoch:
+                (loss_C_source + loss_E_source).backward(retain_graph=True)
+            else:
+                loss_C_source.backward()
+
             nn.utils.clip_grad_value_(model.classifier.parameters(), 5.0)
             optimizers['classifier'].step()
             if opt.share_encoder:
@@ -182,10 +186,11 @@ def train(model, train_loader, test_loader, opt):
                 nn.utils.clip_grad_value_(model.encoder_s.parameters(), 5.0)
                 optimizers['encoder_s'].step()
 
-            set_zero_grad(optimizers, optimizers.keys())
-            loss_D_source.backward()
-            nn.utils.clip_grad_value_(model.discriminator.parameters(), 5.0)
-            optimizers['discriminator'].step()
+            if opt.share_encoder or epoch >= opt.copy_epoch:
+                set_zero_grad(optimizers, optimizers.keys())
+                loss_D_source.backward()
+                nn.utils.clip_grad_value_(model.discriminator.parameters(), 5.0)
+                optimizers['discriminator'].step()
 
             # Target
             target_label_preds, target_domain_preds, target_center_loss = \
@@ -204,31 +209,34 @@ def train(model, train_loader, test_loader, opt):
                 nn.utils.clip_grad_value_(model.center_loss.parameters(), 5.0)
                 optimizers['center_loss'].step()
 
-            # set_zero_grad(optimizers, optimizers.keys())
-            loss_E_target.backward(retain_graph=True)
-            if opt.share_encoder:
-                nn.utils.clip_grad_value_(model.encoder.parameters(), 5.0)
-                optimizers['encoder'].step()
-            else:
-                nn.utils.clip_grad_value_(model.encoder_t.parameters(), 5.0)
-                optimizers['encoder_t'].step()
+            if opt.share_encoder or epoch >= opt.copy_epoch:
+                if epoch==opt.copy_epoch:
+                    model.encoder_t.load_state_dict(model.encoder_s.state_dict())
+                # set_zero_grad(optimizers, optimizers.keys())
+                loss_E_target.backward(retain_graph=True)
+                if opt.share_encoder:
+                    nn.utils.clip_grad_value_(model.encoder.parameters(), 5.0)
+                    optimizers['encoder'].step()
+                else:
+                    nn.utils.clip_grad_value_(model.encoder_t.parameters(), 5.0)
+                    optimizers['encoder_t'].step()
 
-            set_zero_grad(optimizers, optimizers.keys())
-            loss_D_target.backward()
-            nn.utils.clip_grad_value_(model.discriminator.parameters(), 5.0)
-            optimizers['discriminator'].step()
+                set_zero_grad(optimizers, optimizers.keys())
+                loss_D_target.backward()
+                nn.utils.clip_grad_value_(model.discriminator.parameters(), 5.0)
+                optimizers['discriminator'].step()
 
 
             if opt.use_center_loss:
                 # print step info
-                if ((i + 1) % 30 == 0):
+                if ((i + 1) % 10 == 0):
                     print("Epoch [{}/{}] Step [{}/{}]:".format(epoch, opt.epoch, i + 1, len(train_loader)))
                     print('loss_D_source={}, loss_C_source={}, loss_center_source={}'.
                            format(loss_D_source.data.item(), loss_C_source.data.item(), source_center_loss.data.item()))
                     if target_center_loss is not None:
                         print('loss_D_target={}, loss_center_target={}'.format(loss_D_target.data.item(), target_center_loss.data.item()))
             else:
-                if ((i + 1) % 30 == 0):
+                if ((i + 1) % 10 == 0):
                     print("Epoch [{}/{}] Step [{}/{}]:".format(epoch, opt.epoch, i + 1, len(train_loader)))
                     print('loss_D_source={}, loss_C_source={}'.
                           format(loss_D_source.data.item(), loss_C_source.data.item() ))
