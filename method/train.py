@@ -49,7 +49,7 @@ def init_optimizer(model, opt):
         optimizers['encoder_s'] = optim.Adam(model.encoder_s.parameters(), lr=opt.lr_encoder, betas=(0.5, 0.999))
         optimizers['encoder_t'] = optim.Adam(model.encoder_t.parameters(), lr=opt.lr_encoder * 0.1, betas=(0.5, 0.999))
     if opt.use_center_loss:
-        optimizers['center_loss'] = optim.Adam(model.center_loss.parameters(), lr=opt.lr_center)
+        optimizers['center_loss'] = optim.SGD(model.center_loss.parameters(), lr=opt.lr_center, momentum=0.9)
     optimizers['classifier'] = optim.Adam(model.classifier.parameters(), lr=opt.lr_classifier, betas=(0.5, 0.999))
     optimizers['discriminator'] = optim.Adam(model.discriminator.parameters(), lr=opt.lr_discriminator, betas=(0.5, 0.999))
     # optimizer = optim.SGD(parameters, lr=opt.lr_encoder, momentum=0.9)
