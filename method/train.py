@@ -149,7 +149,7 @@ def train(model, train_loader, test_loader, opt):
             beta2 = 0.01
 
 
-         for i, data in enumerate(train_loader):
+        for i, data in enumerate(train_loader):
             # p = float(i + epoch * len(train_loader) / opt.epoch / len(train_loader))
             # alpha = 2. / (1. + np.exp(-10 * p)) - 1
 
