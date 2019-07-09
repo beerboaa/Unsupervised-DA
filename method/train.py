@@ -19,7 +19,7 @@ def init_parser():
     parser.add_argument('--lr_encoder', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--lr_classifier', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--lr_center', type=float, default=0.1, help='learning rate')
-    parser.add_argument('--lr_discriminator', type=float, default=1e-4)
+    parser.add_argument('--lr_discriminator', type=float, default=1e-3)
     parser.add_argument('--epoch', type=int, default=200, help='epoch')
     parser.add_argument('--num_classes', type=int, required=True, help='number of classes')
     parser.add_argument('--image_size', type=int, required=True, help='input size')
@@ -34,7 +34,7 @@ def init_parser():
     parser.add_argument('--threshold_T', type=float, default=0.9)
     parser.add_argument('--decay_step', type=int, default=40)
     parser.add_argument('--unfreeze_layers', type=list, default=[4], help='which layer to fine tune')
-    parser.add_argument('--copy_epoch', type=int, default=15, help='which epoch to start training target networks')
+    parser.add_argument('--copy_epoch', type=int, default=30, help='which epoch to start training target networks')
 
     opt = parser.parse_args()
 
@@ -52,10 +52,10 @@ def init_optimizer(model, opt):
     else:
         if opt.image_size == 32:
             optimizers['encoder_s'] = optim.Adam(model.encoder_s.parameters(), lr=opt.lr_encoder, betas=(0.5, 0.999))
-            optimizers['encoder_t'] = optim.Adam(model.encoder_t.parameters(), lr=opt.lr_encoder * 0.1, betas=(0.5, 0.999))
+            optimizers['encoder_t'] = optim.Adam(model.encoder_t.parameters(), lr=opt.lr_encoder , betas=(0.5, 0.999))
         else:
             optimizers['encoder_s'] = optim.SGD(model.encoder_s.parameters(), lr=opt.lr_encoder, weight_decay=5e-04, momentum=0.9)
-            optimizers['encoder_t'] = optim.SGD(model.encoder_t.parameters(), lr=opt.lr_encoder * 0.1, weight_decay=5e-04, momentum=0.9)
+            optimizers['encoder_t'] = optim.SGD(model.encoder_t.parameters(), lr=opt.lr_encoder , weight_decay=5e-04, momentum=0.9)
     if opt.use_center_loss:
         optimizers['center_loss'] = optim.SGD(model.center_loss.parameters(), lr=opt.lr_center, momentum=0.9)
 
