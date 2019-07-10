@@ -136,11 +136,11 @@ def train(model, train_loader, test_loader, opt):
         # step the scheduler
         step_scheduler(schedulers)
 
-        if epoch < 30:
+        if epoch < 10:
             beta1 = 0.001
             beta2 = 0
 
-        elif epoch < 60:
+        elif epoch < 20:
             beta1 = 0.002
             beta2 = 0.002
 
