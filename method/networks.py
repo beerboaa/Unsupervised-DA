@@ -5,6 +5,7 @@ from torchvision import models
 import torch.nn.functional as F
 from torch.autograd import Function
 from itertools import combinations
+import numpy as np
 
 
 def init_weights(net, gain=0.02):
@@ -230,6 +231,96 @@ class ReverseLayerF(Function):
         output = grad_output.neg() * ctx.alpha
 
         return output, None
+
+
+class TripletLoss(nn.Module):
+    def __init__(self):
+        super(TripletLoss, self).__init__()
+
+    def __call__(self, embeddings, labels):
+
+        with torch.no_grad():
+            triplets = self.get_triplets(embeddings, labels)
+        if not isinstance(triplets, torch.Tensor):
+            return None
+
+        f_A = embeddings[triplets[:, 0]]
+        f_P = embeddings[triplets[:, 1]]
+        f_N = embeddings[triplets[:, 2]]
+
+        ap_D = (f_A - f_P).pow(2).sum(1)  # .pow(.5)
+        an_D = (f_A - f_N).pow(2).sum(1)  # .pow(.5)
+        losses = F.relu(ap_D - an_D + 1.)
+
+        return losses.mean()
+
+    def get_triplets(self, embeddings, y):
+
+        margin = 1
+        D = self.pdist(embeddings)
+        D = D.cpu()
+
+        y = y.cpu().data.numpy().ravel()
+        trip = []
+
+        for label in set(y):
+            label_mask = (y == label)
+            label_indices = np.where(label_mask)[0]
+            if len(label_indices) < 2:
+                continue
+            neg_ind = np.where(np.logical_not(label_mask))[0]
+
+            ap = list(combinations(label_indices, 2))  # All anchor-positive pairs
+            ap = np.array(ap)
+
+            ap_D = D[ap[:, 0], ap[:, 1]]
+
+            # # GET HARD NEGATIVE
+            # if np.random.rand() < 0.5:
+            #   trip += get_neg_hard(neg_ind, hardest_negative,
+            #                D, ap, ap_D, margin)
+            # else:
+            trip += self.get_neg_hard(neg_ind, self.random_neg, D, ap, ap_D, margin)
+
+        if len(trip) == 0:
+            return None
+            # ap = ap[0]
+            # trip.append([ap[0], ap[1], neg_ind[0]])
+
+        trip = np.array(trip)
+
+        return torch.LongTensor(trip)
+
+    def pdist(self, vectors):
+        D = -2 * vectors.mm(torch.t(vectors))
+        D += vectors.pow(2).sum(dim=1).view(1, -1)
+        D += vectors.pow(2).sum(dim=1).view(-1, 1)
+
+        return D
+
+    def get_neg_hard(self, neg_ind, select_func, D, ap, ap_D, margin):
+        trip = []
+
+        for ap_i, ap_di in zip(ap, ap_D):
+            loss_values = (ap_di -
+                           D[torch.LongTensor(np.array([ap_i[0]])),
+                             torch.LongTensor(neg_ind)] + margin)
+
+            loss_values = loss_values.data.cpu().numpy()
+            neg_hard = select_func(loss_values)
+
+            if neg_hard is not None:
+                neg_hard = neg_ind[neg_hard]
+                trip.append([ap_i[0], ap_i[1], neg_hard])
+
+        return trip
+
+    def random_neg(self, loss_values):
+        neg_hards = np.where(loss_values > 0)[0]
+        return np.random.choice(neg_hards) if len(neg_hards) > 0 else None
+
+
+
 
 
 

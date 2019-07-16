@@ -8,6 +8,7 @@ class UDAAN(nn.Module):
         super(UDAAN, self).__init__()
         self.share_encoder = opt.share_encoder
         self.use_center_loss = opt.use_center_loss
+        self.use_triplet_loss = opt.use_triplet_loss
         self.threshold_T = opt.threshold_T
 
         # init encoder
@@ -49,10 +50,14 @@ class UDAAN(nn.Module):
             else:
                 self.center_loss = networks.CenterLoss(opt.num_classes, self.classifier.fc.in_features)
 
+        elif opt.use_triplet_loss:
+            self. triplet_loss = networks.TripletLoss()
+
 
     def forward(self, input, labels, domains):
         # consider 'source domain'
-        center_loss = None
+        disc_loss = None
+
         if domains.sum().item() == 0:
             if self.share_encoder:
                 features = self.encoder(input)
@@ -63,9 +68,12 @@ class UDAAN(nn.Module):
             domain_prediction = self.discriminator(features)
 
             if self.use_center_loss:
-                center_loss = self.center_loss(features, labels)
+                disc_loss = self.center_loss(features, labels)
+            elif self.use_triplet_loss:
+                # use center_loss, but it's actually triplet loss
+                disc_loss = self.triplet_loss(features, labels)
 
-            return label_prediction, domain_prediction, center_loss
+            return label_prediction, domain_prediction, disc_loss
 
         # consider 'target domain'
         else:
@@ -82,10 +90,14 @@ class UDAAN(nn.Module):
                 prob, label_prediction = torch.max(nn.Softmax(dim=1)(label_prediction), 1)
 
                 if len(prob[prob > self.threshold_T]) > 0:
-                    center_loss = self.center_loss(features, label_prediction)
+                    disc_loss = self.center_loss(features, label_prediction)
+            elif self.use_triplet_loss:
+                prob, label_prediction = torch.max(nn.Softmax(dim=1)(label_prediction), 1)
 
+                if len(prob[prob > self.threshold_T]) > 0:
+                    disc_loss = self.triplet_loss(features, label_prediction)
 
-            return None, domain_prediction, center_loss
+            return None, domain_prediction, disc_loss
 
 
 

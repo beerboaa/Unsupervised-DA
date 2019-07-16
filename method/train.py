@@ -35,6 +35,7 @@ def init_parser():
     parser.add_argument('--decay_step', type=int, default=40)
     parser.add_argument('--unfreeze_layers', type=list, default=[4], help='which layer to fine tune')
     parser.add_argument('--copy_epoch', type=int, default=30, help='which epoch to start training target networks')
+    parser.add_argument('--use_triplet_loss', action='store_true', help='use triplet loss')
 
     opt = parser.parse_args()
 
@@ -136,11 +137,11 @@ def train(model, train_loader, test_loader, opt):
         # step the scheduler
         step_scheduler(schedulers)
 
-        if epoch < 10:
+        if epoch < 30:
             beta1 = 0.001
             beta2 = 0
 
-        elif epoch < 20:
+        elif epoch < 60:
             beta1 = 0.002
             beta2 = 0.002
 
@@ -163,7 +164,7 @@ def train(model, train_loader, test_loader, opt):
                 target_domains = torch.ones_like(source_labels).to('cuda')
 
             # Source
-            source_label_preds, source_domain_preds, source_center_loss = \
+            source_label_preds, source_domain_preds, source_disc_loss = \
                                 model(source_images, source_labels, source_domains)
 
             criterions = init_criterion(opt)
@@ -174,13 +175,18 @@ def train(model, train_loader, test_loader, opt):
 
             set_zero_grad(optimizers, optimizers.keys())
             if opt.use_center_loss:
-                source_center_loss *= beta1
+                source_disc_loss *= beta1
 
-                source_center_loss.backward(retain_graph=True)
+                source_disc_loss.backward(retain_graph=True)
                 for param in model.center_loss.parameters():
                     param.grad.data *= (1. / (beta1))
                 nn.utils.clip_grad_value_(model.center_loss.parameters(), 5.0)
                 optimizers['center_loss'].step()
+
+            elif opt.use_triplet_loss:
+                if isinstance(source_disc_loss, torch.Tensor):
+                    source_disc_loss *= beta1
+                    source_disc_loss.backward(retain_graph=True)
 
             if opt.share_encoder or epoch >= opt.copy_epoch:
                 (loss_C_source + loss_E_source).backward(retain_graph=True)
@@ -203,21 +209,27 @@ def train(model, train_loader, test_loader, opt):
                 optimizers['discriminator'].step()
 
             # Target
-            target_label_preds, target_domain_preds, target_center_loss = \
+            target_label_preds, target_domain_preds, target_disc_loss = \
                                 model(target_images, target_labels, target_domains)
 
             loss_D_target = criterions['GANLoss'](target_domain_preds, False) * opt.alpha_d
             loss_E_target = criterions['GANLoss'](target_domain_preds, True) * opt.alpha_d
 
             set_zero_grad(optimizers, optimizers.keys())
-            if opt.use_center_loss and beta2 != 0 and target_center_loss is not None:
-                target_center_loss *= beta2
+            if opt.use_center_loss and beta2 != 0 and target_disc_loss is not None:
+                target_disc_loss *= beta2
 
-                target_center_loss.backward(retain_graph=True)
+                target_disc_loss.backward(retain_graph=True)
                 for param in model.center_loss.parameters():
                     param.grad.data *= (1. / (beta2))
                 nn.utils.clip_grad_value_(model.center_loss.parameters(), 5.0)
                 optimizers['center_loss'].step()
+
+            elif opt.use_triplet_loss and beta2 != 0 and target_disc_loss is not None:
+
+                if isinstance(target_disc_loss, torch.Tensor):
+                    target_disc_loss *= beta1
+                    target_disc_loss.backward(retain_graph=True)
 
             if opt.share_encoder or epoch >= opt.copy_epoch:
                 if epoch==opt.copy_epoch and not opt.share_encoder:
@@ -237,14 +249,14 @@ def train(model, train_loader, test_loader, opt):
                 optimizers['discriminator'].step()
 
 
-            if opt.use_center_loss:
+            if opt.use_center_loss or opt.use_triplet_loss:
                 # print step info
                 if ((i + 1) % 10 == 0):
                     print("Epoch [{}/{}] Step [{}/{}]:".format(epoch, opt.epoch, i + 1, len(train_loader)))
-                    print('loss_D_source={}, loss_C_source={}, loss_center_source={}'.
-                           format(loss_D_source.data.item(), loss_C_source.data.item(), source_center_loss.data.item()))
-                    if target_center_loss is not None:
-                        print('loss_D_target={}, loss_center_target={}'.format(loss_D_target.data.item(), target_center_loss.data.item()))
+                    print('loss_D_source={}, loss_C_source={}, loss_disc_source={}'.
+                           format(loss_D_source.data.item(), loss_C_source.data.item(), source_disc_loss.data.item()))
+                    if target_disc_loss is not None:
+                        print('loss_D_target={}, loss_disc_target={}'.format(loss_D_target.data.item(), target_disc_loss.data.item()))
             else:
                 if ((i + 1) % 10 == 0):
                     print("Epoch [{}/{}] Step [{}/{}]:".format(epoch, opt.epoch, i + 1, len(train_loader)))
