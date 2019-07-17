@@ -137,17 +137,17 @@ def train(model, train_loader, test_loader, opt):
         # step the scheduler
         step_scheduler(schedulers)
 
-        if epoch < 30:
+        if epoch < 15:
             beta1 = 0.001
             beta2 = 0
 
-        elif epoch < 60:
+        elif epoch < 30:
             beta1 = 0.002
             beta2 = 0.002
 
         else:
-            beta1 = 0.01
-            beta2 = 0.01
+            beta1 = 0.02
+            beta2 = 0.02
 
 
         for i, data in enumerate(train_loader):
@@ -251,14 +251,15 @@ def train(model, train_loader, test_loader, opt):
 
             if opt.use_center_loss or opt.use_triplet_loss:
                 # print step info
-                if ((i + 1) % 10 == 0):
+                if ((i + 1) % 200 == 0):
                     print("Epoch [{}/{}] Step [{}/{}]:".format(epoch, opt.epoch, i + 1, len(train_loader)))
-                    print('loss_D_source={}, loss_C_source={}, loss_disc_source={}'.
+                    if source_disc_loss is not None:
+                        print('loss_D_source={}, loss_C_source={}, loss_disc_source={}'.
                            format(loss_D_source.data.item(), loss_C_source.data.item(), source_disc_loss.data.item()))
                     if target_disc_loss is not None:
                         print('loss_D_target={}, loss_disc_target={}'.format(loss_D_target.data.item(), target_disc_loss.data.item()))
             else:
-                if ((i + 1) % 10 == 0):
+                if ((i + 1) % 200 == 0):
                     print("Epoch [{}/{}] Step [{}/{}]:".format(epoch, opt.epoch, i + 1, len(train_loader)))
                     print('loss_D_source={}, loss_C_source={}'.
                           format(loss_D_source.data.item(), loss_C_source.data.item() ))
