@@ -53,10 +53,10 @@ def init_optimizer(model, opt):
     else:
         if opt.image_size == 32:
             optimizers['encoder_s'] = optim.Adam(model.encoder_s.parameters(), lr=opt.lr_encoder, betas=(0.5, 0.999))
-            optimizers['encoder_t'] = optim.Adam(model.encoder_t.parameters(), lr=opt.lr_encoder , betas=(0.5, 0.999))
+            optimizers['encoder_t'] = optim.Adam(model.encoder_t.parameters(), lr=opt.lr_encoder * 0.2, betas=(0.5, 0.999))
         else:
             optimizers['encoder_s'] = optim.SGD(model.encoder_s.parameters(), lr=opt.lr_encoder, weight_decay=5e-04, momentum=0.9)
-            optimizers['encoder_t'] = optim.SGD(model.encoder_t.parameters(), lr=opt.lr_encoder , weight_decay=5e-04, momentum=0.9)
+            optimizers['encoder_t'] = optim.SGD(model.encoder_t.parameters(), lr=opt.lr_encoder * 0.2, weight_decay=5e-04, momentum=0.9)
     if opt.use_center_loss:
         optimizers['center_loss'] = optim.SGD(model.center_loss.parameters(), lr=opt.lr_center, momentum=0.9)
 
@@ -137,17 +137,17 @@ def train(model, train_loader, test_loader, opt):
         # step the scheduler
         step_scheduler(schedulers)
 
-        if epoch < 40:
+        if epoch < 30:
             beta1 = 0.001
             beta2 = 0
 
-        elif epoch < 80:
+        elif epoch < 60:
             beta1 = 0.002
             beta2 = 0.002
 
         else:
-            beta1 = 0.01
-            beta2 = 0.01
+            beta1 = 0.02
+            beta2 = 0.02
 
 
         for i, data in enumerate(train_loader):
