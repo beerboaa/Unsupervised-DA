@@ -36,6 +36,8 @@ def init_parser():
     parser.add_argument('--unfreeze_layers', type=list, default=[4], help='which layer to fine tune')
     parser.add_argument('--copy_epoch', type=int, default=30, help='which epoch to start training target networks')
     parser.add_argument('--use_triplet_loss', action='store_true', help='use triplet loss')
+    parser.add_argument('--gen_path', type=str, default=None, help='use translated images for training')
+
 
     opt = parser.parse_args()
 
@@ -154,7 +156,7 @@ def train(model, train_loader, test_loader, opt):
             # p = float(i + epoch * len(train_loader) / opt.epoch / len(train_loader))
             # alpha = 2. / (1. + np.exp(-10 * p)) - 1
 
-            source_images, source_labels, target_images, target_labels = data
+            source_images, source_labels, target_images, target_labels, gen_images, gen_labels = data
             if torch.cuda.is_available():
                 source_images = source_images.to('cuda')
                 source_labels = source_labels.to('cuda')
@@ -162,6 +164,10 @@ def train(model, train_loader, test_loader, opt):
                 target_images = target_images.to('cuda')
                 target_labels = target_labels.to('cuda')
                 target_domains = torch.ones_like(source_labels).to('cuda')
+                if opt.gen_path is not None:
+                    gen_images = gen_images.to('cuda')
+                    gen_labels = gen_labels.to('cuda')
+                    gen_domains = (torch.ones_like(source_labels) * (-1)).to('cuda')
 
             # Source
             source_label_preds, source_domain_preds, source_disc_loss = \
@@ -248,6 +254,56 @@ def train(model, train_loader, test_loader, opt):
                 nn.utils.clip_grad_value_(model.discriminator.parameters(), 5.0)
                 optimizers['discriminator'].step()
 
+            # Gen path
+            if opt.gen_path is not None:
+                gen_label_preds, gen_domain_preds, gen_disc_loss = \
+                    model(gen_images, gen_labels, gen_domains)
+
+                loss_D_gen = criterions['GANLoss'](gen_domain_preds, False) * opt.alpha_d
+                loss_E_gen = criterions['GANLoss'](gen_domain_preds, True) * opt.alpha_d
+                loss_C_gen = criterions['CELoss'](gen_label_preds, gen_labels.long()) * opt.alpha_c
+
+                set_zero_grad(optimizers, optimizers.keys())
+                if opt.use_center_loss and beta2 != 0 and gen_disc_loss is not None:
+                    gen_disc_loss *= beta2
+
+                    gen_disc_loss.backward(retain_graph=True)
+                    for param in model.center_loss.parameters():
+                        param.grad.data *= (1. / (beta2))
+                    nn.utils.clip_grad_value_(model.center_loss.parameters(), 5.0)
+                    optimizers['center_loss'].step()
+
+                elif opt.use_triplet_loss and beta2 != 0 and gen_disc_loss is not None:
+
+                    if isinstance(gen_disc_loss, torch.Tensor):
+                        gen_disc_loss *= beta1
+                        gen_disc_loss.backward(retain_graph=True)
+
+                if opt.share_encoder or epoch >= opt.copy_epoch:
+                    (loss_C_gen + loss_E_gen).backward(retain_graph=True)
+                else:
+                    loss_C_gen.backward()
+
+                nn.utils.clip_grad_value_(model.classifier.parameters(), 5.0)
+                optimizers['classifier'].step()
+
+                if opt.share_encoder or epoch >= opt.copy_epoch:
+
+                    # set_zero_grad(optimizers, optimizers.keys())
+
+                    if opt.share_encoder:
+                        nn.utils.clip_grad_value_(model.encoder.parameters(), 5.0)
+                        optimizers['encoder'].step()
+                    else:
+                        nn.utils.clip_grad_value_(model.encoder_t.parameters(), 5.0)
+                        optimizers['encoder_t'].step()
+
+                    set_zero_grad(optimizers, optimizers.keys())
+                    loss_D_gen.backward()
+                    nn.utils.clip_grad_value_(model.discriminator.parameters(), 5.0)
+                    optimizers['discriminator'].step()
+
+            #==========================================================================================
 
             if opt.use_center_loss or opt.use_triplet_loss:
                 # print step info

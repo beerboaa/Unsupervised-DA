@@ -33,6 +33,14 @@ class TrainDataset(data.Dataset):
 
         self.data_size = max(self.s_data_size, self.t_data_size)
 
+        self.gen_path = opt.gen_path
+        # Gen path
+        if self.gen_path is not None:
+            self.gen_dir = os.path.abspath(opt.gen_path)
+            self.gen_image_paths = os.listdir(self.gen_dir)
+            self.gen_image_paths = [os.path.join(self.gen_dir, p) for p in self.gen_image_paths]
+            self.gen_image_paths = sorted(self.gen_image_paths)
+
         # pre-processing for training
         if opt.image_size == 224:
             self.transform = transforms.Compose([
@@ -47,19 +55,30 @@ class TrainDataset(data.Dataset):
                              transforms.Normalize([0.5,0.5,0.5], [0.5,0.5,0.5])])
 
     def __getitem__(self, index):
+        gen_image = None
+        gen_label = None
+
         if self.s_data_size >= self.t_data_size:
             s_image_path = self.s_image_paths[index % self.data_size]
             t_image_path = self.t_image_paths[random.randint(0, self.t_data_size - 1)]
+            if self.gen_path is not None:
+                gen_image_path = self.gen_image_paths[index % self.data_size]
         else:
             s_image_path = self.s_image_paths[random.randint(0, self.s_data_size - 1)]
             t_image_path = self.t_image_paths[index % self.data_size]
+            if self.gen_path is not None:
+                gen_image_path = self.gen_image_paths[random.randint(0, self.s_data_size - 1)]
 
         if self.image_size == 224:
             s_image = Image.open(s_image_path).convert('RGB')
             t_image = Image.open(t_image_path).convert('RGB')
+            if self.gen_path is not None:
+                gen_image = Image.open(gen_image_path).convert('RGB')
         else:
             s_image = Image.open(s_image_path).convert('RGB')
             t_image = Image.open(t_image_path).convert('RGB')
+            if self.gen_path is not None:
+                gen_image = Image.open(gen_image_path).convert('RGB')
             # s_image = Image.open(s_image_path).convert('L')
             # t_image = Image.open(t_image_path).convert('L')
 
@@ -68,7 +87,11 @@ class TrainDataset(data.Dataset):
         t_image = self.transform(t_image)
         t_label = torch.from_numpy(np.array(int(ntpath.basename(t_image_path).split('_')[0])))
 
-        return s_image, s_label, t_image, t_label
+        if self.gen_path is not None:
+            gen_image = self.transform(gen_image)
+            gen_label = torch.from_numpy(np.array(int(ntpath.basename(gen_image_path).split('_')[0])))
+
+        return s_image, s_label, t_image, t_label, gen_image, gen_label
 
     def __len__(self):
         return max(self.s_data_size, self.t_data_size)

@@ -76,7 +76,7 @@ class UDAAN(nn.Module):
             return label_prediction, domain_prediction, disc_loss
 
         # consider 'target domain'
-        else:
+        elif domains.sum().item() > 0:
             if self.share_encoder:
                 features = self.encoder(input)
             else:
@@ -99,7 +99,22 @@ class UDAAN(nn.Module):
 
             return None, domain_prediction, disc_loss
 
+        else:
+            if self.share_encoder:
+                features = self.encoder(input)
+            else:
+                features = self.encoder_t(input)
 
+            label_prediction = self.classifier(features)
+            domain_prediction = self.discriminator(features)
+
+            if self.use_center_loss:
+                disc_loss = self.center_loss(features, labels)
+            elif self.use_triplet_loss:
+                # use center_loss, but it's actually triplet loss
+                disc_loss = self.triplet_loss(features, labels)
+
+            return label_prediction, domain_prediction, disc_loss
 
 
 
