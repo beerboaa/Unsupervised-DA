@@ -55,8 +55,8 @@ class TrainDataset(data.Dataset):
                              transforms.Normalize([0.5,0.5,0.5], [0.5,0.5,0.5])])
 
     def __getitem__(self, index):
-        gen_image = None
-        gen_label = None
+        gen_image = torch.tensor(0)
+        gen_label = torch.tensor(0)
 
         if self.s_data_size >= self.t_data_size:
             s_image_path = self.s_image_paths[index % self.data_size]

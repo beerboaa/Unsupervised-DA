@@ -302,9 +302,9 @@ def train(model, train_loader, test_loader, opt):
                     loss_D_gen.backward()
                     nn.utils.clip_grad_value_(model.discriminator.parameters(), 5.0)
                     optimizers['discriminator'].step()
-
-            #==========================================================================================
-
+            #
+            # #==========================================================================================
+            #
             if opt.use_center_loss or opt.use_triplet_loss:
                 # print step info
                 if ((i + 1) % 200 == 0):
